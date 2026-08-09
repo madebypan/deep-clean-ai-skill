@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="bridge-token" content="">
+  <title>Deep Clean AI · Mac 空間唯讀清查</title>
+  <style>
+    :root {
+      --paper: #f7f5f1;
+      --panel: #fffdfa;
+      --ink: #181614;
+      --muted: #716b66;
+      --line: #ded9d2;
+      --soft-line: #ece8e2;
+      --accent: #9d1737;
+      --p1: #8f102f;
+      --p2: #b32345;
+      --p3: #d64f6d;
+      --p4: #e7869a;
+      --p5: #f2b8c3;
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang TC", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--paper); color: var(--ink); }
+    body { padding: 28px; }
+    button { font: inherit; }
+    .shell { max-width: 1540px; margin: 0 auto; }
+    .bar { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 22px; }
+    h1 { margin: 0 0 6px; font-size: clamp(25px, 3vw, 42px); letter-spacing: -.045em; }
+    .sub { color: var(--muted); font-size: 14px; }
+    .bridge { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; white-space: nowrap; }
+    .bridge-dot { width: 8px; height: 8px; border-radius: 99px; background: #aaa39c; }
+    .bridge.live .bridge-dot { background: #2b8b5a; box-shadow: 0 0 0 4px #2b8b5a1a; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); background: var(--panel); }
+    .stat { padding: 17px 20px; min-width: 0; }
+    .stat + .stat { border-left: 1px solid var(--line); }
+    .stat-label { color: var(--muted); font-size: 12px; margin-bottom: 7px; }
+    .stat-value { font-size: clamp(21px, 2.8vw, 32px); font-weight: 730; letter-spacing: -.035em; white-space: nowrap; }
+    .estimate { display: grid; grid-template-columns: minmax(150px, .65fr) minmax(240px, 1.5fr) minmax(150px, .65fr); align-items: center; gap: 18px; padding: 13px 20px; border: 1px solid var(--line); border-top: 0; background: var(--panel); margin-bottom: 16px; }
+    .estimate-value { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .estimate-label { color: var(--muted); font-size: 11px; margin-top: 2px; }
+    .estimate-side:last-child { text-align: right; }
+    .estimate-track { height: 8px; display: flex; overflow: hidden; border-radius: 99px; background: var(--soft-line); }
+    .estimate-conservative { background: var(--p1); min-width: 2px; }
+    .estimate-review { background: var(--p4); min-width: 2px; }
+    .estimate-note { color: var(--muted); font-size: 10px; text-align: center; margin-top: 5px; }
+    .layout { display: grid; grid-template-columns: minmax(300px, 0.72fr) minmax(520px, 1.45fr); min-height: 660px; border: 1px solid var(--line); background: var(--panel); }
+    .plan { min-width: 0; padding: 24px; border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+    .plan-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+    h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+    .plan-meta { margin-top: 5px; color: var(--muted); font-size: 13px; }
+    .copy { border: 1px solid var(--ink); background: transparent; color: var(--ink); border-radius: 999px; padding: 8px 13px; cursor: pointer; }
+    .copy:disabled { opacity: .35; cursor: default; }
+    .selected-list { min-height: 240px; overflow: auto; }
+    .empty { color: var(--muted); line-height: 1.65; padding: 30px 4px; font-size: 14px; }
+    .selected-item { padding: 17px 0; border-bottom: 1px solid var(--soft-line); }
+    .selected-top, .selected-path { display: grid; align-items: center; gap: 12px; }
+    .selected-top { grid-template-columns: 10px minmax(0, 1fr) auto; }
+    .selected-path { grid-template-columns: minmax(0, 1fr) 28px; margin: 8px 0 0 22px; }
+    .swatch { width: 9px; height: 9px; border-radius: 99px; }
+    .selected-title { font-weight: 650; line-height: 1.35; min-width: 0; }
+    .selected-size { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .selected-flags { margin: 7px 0 0 22px; color: var(--muted); font-size: 11px; }
+    .path { color: var(--muted); font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .remove { width: 28px; height: 28px; border: 0; background: transparent; color: #8a837d; font-size: 23px; cursor: pointer; line-height: 1; }
+    .remove:hover { color: var(--accent); }
+    .legend { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 10px 13px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+    .viz { min-width: 0; padding: 18px; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+    .viz-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; min-height: 44px; padding: 0 4px 10px; }
+    .crumb { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .back { display: none; border: 0; background: transparent; color: var(--accent); padding: 5px 0; cursor: pointer; }
+    .back.visible { display: inline; }
+    .view-title { font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hint { color: var(--muted); font-size: 12px; text-align: right; }
+    .stage { position: relative; min-height: 540px; overflow: hidden; touch-action: none; }
+    canvas { width: 100%; height: 100%; display: block; }
+    .tooltip { position: fixed; z-index: 4; display: none; pointer-events: none; width: min(400px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: hidden auto; background: #181614; color: white; border: 1px solid #ffffff24; border-radius: 12px; box-shadow: 0 16px 48px #0005; font-size: 12px; line-height: 1.45; }
+    .tooltip.show { display: block; }
+    .tip-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 16px; padding: 15px 16px 13px; }
+    .tip-title { min-width: 0; font-size: 15px; font-weight: 720; line-height: 1.35; letter-spacing: -.01em; }
+    .tip-size { color: #fff; font: 700 14px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+    .tip-metrics { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid #ffffff1f; border-bottom: 1px solid #ffffff1f; }
+    .tip-metric { padding: 10px 16px; min-width: 0; }
+    .tip-metric + .tip-metric { border-left: 1px solid #ffffff1f; }
+    .tip-label { color: #9f9993; font-size: 10px; letter-spacing: .04em; margin-bottom: 2px; }
+    .tip-value { color: #f7f5f1; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .tip-badges { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid #ffffff1f; }
+    .tip-badge { padding: 3px 7px; border: 1px solid #ffffff2b; border-radius: 999px; color: #ded9d2; font-size: 10px; white-space: nowrap; }
+    .tip-details { padding: 4px 16px 10px; }
+    .tip-row { display: grid; grid-template-columns: 66px minmax(0, 1fr); gap: 10px; padding: 7px 0; }
+    .tip-row + .tip-row { border-top: 1px solid #ffffff14; }
+    .tip-row-label { color: #9f9993; }
+    .tip-row-value { min-width: 0; color: #e7e3de; overflow-wrap: anywhere; }
+    .tip-copy { padding: 11px 16px 12px; border-top: 1px solid #ffffff1f; }
+    .tip-copy-label { color: #9f9993; font-size: 10px; letter-spacing: .04em; margin-bottom: 4px; }
+    .tip-copy-text { color: #f7f5f1; font-size: 12px; line-height: 1.55; }
+    .tip-path { color: #c9c3bd; font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; padding: 11px 16px 13px; border-top: 1px solid #ffffff1f; background: #ffffff08; }
+    .toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 12px); opacity: 0; pointer-events: none; background: #181614; color: #fff; border-radius: 999px; padding: 10px 16px; font-size: 13px; transition: .18s ease; z-index: 5; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    @media (max-width: 900px) {
+      body { padding: 14px; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .stat:nth-child(3) { border-left: 0; border-top: 1px solid var(--line); }
+      .stat:nth-child(4) { border-top: 1px solid var(--line); }
+      .estimate { grid-template-columns: 1fr 1.5fr 1fr; padding: 12px; gap: 10px; }
+      .layout { grid-template-columns: 1fr; }
+      .plan { border-right: 0; border-bottom: 1px solid var(--line); }
+      .stage { min-height: 520px; }
+    }
+    @media (max-width: 520px) {
+      .bar { align-items: start; flex-direction: column; }
+      .stats { grid-template-columns: 1fr; }
+      .stat + .stat { border-left: 0; border-top: 1px solid var(--line); }
+      .estimate { grid-template-columns: 1fr 1fr; }
+      .estimate-track-wrap { grid-column: 1 / -1; grid-row: 2; }
+      .layout { border-left: 0; border-right: 0; }
+      .plan, .viz { padding-left: 10px; padding-right: 10px; }
+      .hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="bar">
+      <div>
+        <h1>Deep Clean AI</h1>
+        <div class="sub" id="scanMeta"></div>
+      </div>
+      <div class="bridge" id="bridgeState"><span class="bridge-dot"></span><span>Finder 橋接未連線</span></div>
+    </header>
+
+    <section class="stats" aria-label="空間摘要">
+      <div class="stat"><div class="stat-label">磁碟總容量</div><div class="stat-value" id="totalSize">—</div></div>
+      <div class="stat"><div class="stat-label">目前已用</div><div class="stat-value" id="usedSize">—</div></div>
+      <div class="stat"><div class="stat-label">候選總量</div><div class="stat-value" id="candidateSize">—</div></div>
+      <div class="stat"><div class="stat-label">保留／未判定</div><div class="stat-value" id="keepSize">—</div></div>
+    </section>
+
+    <section class="estimate" aria-label="候選容量信心口徑">
+      <div class="estimate-side"><div class="estimate-value" id="conservativeSize">—</div><div class="estimate-label">高把握候選</div></div>
+      <div class="estimate-track-wrap"><div class="estimate-track"><span class="estimate-conservative" id="conservativeBar"></span><span class="estimate-review" id="reviewBar"></span></div><div class="estimate-note">高把握仍不代表已授權移除</div></div>
+      <div class="estimate-side"><div class="estimate-value" id="reviewSize">—</div><div class="estimate-label">需人工確認候選</div></div>
+    </section>
+
+    <section class="layout">
+      <aside class="plan">
+        <div class="plan-head">
+          <div><h2>預計移除</h2><div class="plan-meta" id="planMeta">尚未選擇</div></div>
+          <button class="copy" id="copyButton" disabled>複製清單</button>
+        </div>
+        <div class="selected-list" id="selectedList"><div class="empty">點進群組後，點擊細項加入規劃。這份清單只存在目前頁面的記憶體中。</div></div>
+        <div class="legend" id="legend"></div>
+      </aside>
+
+      <section class="viz">
+        <div class="viz-head">
+          <div class="crumb"><button class="back" id="backButton">← 全部群組</button><span class="view-title" id="viewTitle">候選空間群組</span></div>
+          <div class="hint">雙指放大聚焦 · Option 點擊 Finder · ⌘↵ Finder</div>
+        </div>
+        <div class="stage" id="stage"><canvas id="chart" aria-label="Deep Clean AI 候選空間圓環圖"></canvas></div>
+      </section>
+    </section>
+  </main>
+
+  <div class="tooltip" id="tooltip"></div>
+  <div class="toast" id="toast"></div>
+  <script id="auditData" type="application/json">__AUDIT_DATA__</script>
+  <script>
+    (() => {
+      'use strict';
+      const audit = JSON.parse(document.getElementById('auditData').textContent);
+      const bridgeToken = document.querySelector('meta[name="bridge-token"]')?.content || '';
+      const candidates = Array.isArray(audit.candidates) ? audit.candidates : [];
+      const palette = { 1: '#8f102f', 2: '#b32345', 3: '#d64f6d', 4: '#e7869a', 5: '#f2b8c3' };
+      const groupOrder = ['anomalies', 'downloads', 'old-plugins', 'package-caches', 'runtime-caches', 'app-caches', 'dev-artifacts', 'simulator', 'git', 'app-data', 'manual'];
+      const groupNames = {
+        anomalies: '大型異常項目', downloads: '下載與安裝檔', 'old-plugins': '舊版外掛', 'package-caches': '套件快取',
+        'runtime-caches': '工具與執行環境快取', 'app-caches': 'App 快取', 'dev-artifacts': '開發建置產物',
+        simulator: '模擬器與 Xcode', git: '大型 Git 資料', 'app-data': '大型 App 資料', manual: '人工檢查'
+      };
+      const canvas = document.getElementById('chart');
+      const stage = document.getElementById('stage');
+      const ctx = canvas.getContext('2d');
+      const tooltip = document.getElementById('tooltip');
+      const toastNode = document.getElementById('toast');
+      const selectedList = document.getElementById('selectedList');
+      const copyButton = document.getElementById('copyButton');
+      const backButton = document.getElementById('backButton');
+      const viewTitle = document.getElementById('viewTitle');
+      const selected = new Set();
+      let focusedGroup = null;
+      let hoverSlice = null;
+      let slices = [];
+      let geometry = null;
+      let toastTimer = null;
+
+      const candidateBytes = candidates.reduce((sum, item) => sum + item.sizeBytes, 0);
+      const conservativeBytes = Number(audit.summary?.conservativeBytes ?? candidates.filter((item) => item.estimateClass === 'conservative').reduce((sum, item) => sum + item.sizeBytes, 0));
+      const reviewBytes = Math.max(0, Number(audit.summary?.reviewBytes ?? candidateBytes - conservativeBytes));
+      const usedBytes = Number(audit.volume?.usedBytes || 0);
+      const totalBytes = Number(audit.volume?.totalBytes || 0);
+      const keepBytes = Math.max(0, usedBytes - candidateBytes);
+      const groups = groupOrder.map((key) => {
+        const items = candidates.filter((item) => item.group === key).sort((a, b) => b.sizeBytes - a.sizeBytes);
+        return {
+          key, label: groupNames[key] || key, items,
+          sizeBytes: items.reduce((sum, item) => sum + item.sizeBytes, 0),
+          priority: items.length ? Math.min(...items.map((item) => item.priority)) : 5
+        };
+      }).filter((group) => group.items.length);
+
+      function formatBytes(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const value = bytes / Math.pow(1024, index);
+        return `${value >= 100 ? value.toFixed(0) : value >= 10 ? value.toFixed(1) : value.toFixed(2)} ${units[index]}`;
+      }
+      function percent(part, whole) { return whole > 0 ? `${(part / whole * 100).toFixed(part / whole < .001 ? 2 : 1)}%` : '0%'; }
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+      }
+      const rebuildabilityLabels = { easy: '容易重建', conditional: '有條件重建', no: '不可假定可重建' };
+      const impactLabels = { low: '低', medium: '中', high: '高' };
+      const confidenceLabels = { high: '高', medium: '中', low: '低' };
+      function itemFlags(item) {
+        const estimate = item.estimateClass === 'conservative' ? '高把握候選' : '人工確認候選';
+        return `${estimate} · ${rebuildabilityLabels[item.rebuildability] || '未判定'} · 影響 ${impactLabels[item.impact] || '未判定'}`;
+      }
+      function showToast(message) {
+        toastNode.textContent = message;
+        toastNode.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastNode.classList.remove('show'), 2300);
+      }
+
+      document.getElementById('totalSize').textContent = formatBytes(totalBytes);
+      document.getElementById('usedSize').textContent = formatBytes(usedBytes);
+      document.getElementById('candidateSize').textContent = formatBytes(candidateBytes);
+      document.getElementById('keepSize').textContent = formatBytes(keepBytes);
+      document.getElementById('conservativeSize').textContent = formatBytes(conservativeBytes);
+      document.getElementById('reviewSize').textContent = formatBytes(reviewBytes);
+      document.getElementById('conservativeBar').style.width = percent(conservativeBytes, candidateBytes);
+      document.getElementById('reviewBar').style.width = percent(reviewBytes, candidateBytes);
+      document.getElementById('scanMeta').textContent = `Mac 空間唯讀清查 · ${new Date(audit.scannedAt).toLocaleString('zh-TW')} · ${candidates.length} 個候選 · ${audit.scanMeta?.mode === 'quick' ? '快速掃描' : '完整掃描'}`;
+      document.getElementById('legend').innerHTML = [1, 2, 3, 4, 5].map((priority) => `<span class="legend-item"><i class="swatch" style="background:${palette[priority]}"></i>優先級 ${priority}</span>`).join('');
+
+      function currentData() {
+        if (!focusedGroup) return groups.map((group) => ({
+          type: 'group', id: group.key, label: group.label, sizeBytes: group.sizeBytes,
+          priority: group.priority, group, path: '', reason: `${group.items.length} 個候選細項`
+        }));
+        return groups.find((group) => group.key === focusedGroup)?.items.map((item) => ({ ...item, type: 'item' })) || [];
+      }
+
+      function selectedInGroup(group) { return group.items.filter((item) => selected.has(item.id)).length; }
+
+      function fitCanvas() {
+        const rect = stage.getBoundingClientRect();
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.max(1, Math.round(rect.width * ratio));
+        canvas.height = Math.max(1, Math.round(rect.height * ratio));
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        draw();
+      }
+
+      function draw() {
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        ctx.clearRect(0, 0, width, height);
+        const data = currentData();
+        const total = data.reduce((sum, item) => sum + item.sizeBytes, 0);
+        const radius = Math.max(80, Math.min(width, height) * .42);
+        const thickness = Math.max(52, radius * .34);
+        const inner = radius - thickness;
+        const cx = width / 2;
+        const cy = height / 2 + 4;
+        geometry = { cx, cy, inner, radius };
+        slices = [];
+
+        if (!data.length || total <= 0) {
+          ctx.fillStyle = '#716b66'; ctx.textAlign = 'center'; ctx.font = '15px -apple-system';
+          ctx.fillText('沒有符合門檻的候選項目', cx, cy);
+          return;
+        }
+
+        let angle = -Math.PI / 2;
+        data.forEach((item) => {
+          const span = item.sizeBytes / total * Math.PI * 2;
+          const end = angle + span;
+          const gap = Math.min(.006, span * .12);
+          const startDraw = angle + gap / 2;
+          const endDraw = end - gap / 2;
+          const active = hoverSlice?.id === item.id;
+          const isSelected = item.type === 'item' ? selected.has(item.id) : selectedInGroup(item.group) > 0;
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius + (active ? 5 : 0), startDraw, endDraw);
+          ctx.arc(cx, cy, inner - (active ? 2 : 0), endDraw, startDraw, true);
+          ctx.closePath();
+          ctx.fillStyle = palette[item.priority] || palette[5];
+          ctx.fill();
+
+          if (isSelected) {
+            ctx.save();
+            ctx.strokeStyle = '#fffdfa'; ctx.lineWidth = 5;
+            ctx.stroke();
+            ctx.strokeStyle = '#181614'; ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+          }
+          slices.push({ ...item, start: angle, end });
+          angle = end;
+        });
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#716b66';
+        ctx.font = '600 13px -apple-system, BlinkMacSystemFont, sans-serif';
+        const centerItem = hoverSlice || (focusedGroup ? groups.find((group) => group.key === focusedGroup) : null);
+        const centerLabel = centerItem?.label || '候選總量';
+        ctx.fillText(centerLabel.length > 24 ? `${centerLabel.slice(0, 23)}…` : centerLabel, cx, cy - 31);
+        ctx.fillStyle = '#181614';
+        ctx.font = `750 ${Math.max(25, Math.min(43, radius * .2))}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+        ctx.fillText(formatBytes(centerItem?.sizeBytes || total), cx, cy + 17);
+        ctx.fillStyle = '#716b66';
+        ctx.font = '13px -apple-system, BlinkMacSystemFont, sans-serif';
+        const denominator = focusedGroup ? total : candidateBytes;
+        ctx.fillText(`${percent(centerItem?.sizeBytes || total, denominator)} · 佔已用 ${percent(centerItem?.sizeBytes || total, usedBytes)}`, cx, cy + 44);
+      }
+
+      function pointerSlice(event) {
+        if (!geometry) return null;
+        const rect = canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left - geometry.cx;
+        const y = event.clientY - rect.top - geometry.cy;
+        const distance = Math.hypot(x, y);
+        if (distance < geometry.inner - 6 || distance > geometry.radius + 12) return null;
+        let angle = Math.atan2(y, x);
+        if (angle < -Math.PI / 2) angle += Math.PI * 2;
+        return slices.find((slice) => angle >= slice.start && angle < slice.end) || null;
+      }
+
+      function positionTooltip(event, item) {
+        if (!item) { tooltip.classList.remove('show'); return; }
+        const groupTotal = focusedGroup ? groups.find((group) => group.key === focusedGroup)?.sizeBytes : candidateBytes;
+        const detailRows = [];
+        if (item.type === 'item' && item.matchedRule) detailRows.push(['掃描依據', `${item.matchedRule} · 門檻 ${formatBytes(item.thresholdBytes || 0)}`]);
+        if (item.type === 'item' && item.modifiedAt) detailRows.push(['最後修改', new Date(item.modifiedAt).toLocaleString('zh-TW')]);
+        if (item.type === 'item' && item.logicalSizeBytes && Math.abs(item.logicalSizeBytes - item.sizeBytes) > item.sizeBytes * .1) {
+          detailRows.push(['空間口徑', `實際配置 ${formatBytes(item.sizeBytes)} · 邏輯大小 ${formatBytes(item.logicalSizeBytes)}`]);
+        }
+        const details = detailRows.length ? `<div class="tip-details">${detailRows.map(([label, value]) => `<div class="tip-row"><div class="tip-row-label">${escapeHtml(label)}</div><div class="tip-row-value">${escapeHtml(value)}</div></div>`).join('')}</div>` : '';
+        const badges = item.type === 'item' ? [
+          item.estimateClass === 'conservative' ? '高把握候選' : '人工確認候選',
+          rebuildabilityLabels[item.rebuildability] || '重建性未判定',
+          `影響 ${impactLabels[item.impact] || '未判定'}`,
+          `信心 ${confidenceLabels[item.confidence] || '未判定'}`
+        ] : [];
+        const badgeRow = badges.length ? `<div class="tip-badges">${badges.map((badge) => `<span class="tip-badge">${escapeHtml(badge)}</span>`).join('')}</div>` : '';
+        const reason = item.reason ? `<div class="tip-copy"><div class="tip-copy-label">${item.type === 'group' ? '內容' : '判斷說明'}</div><div class="tip-copy-text">${escapeHtml(item.reason)}</div></div>` : '';
+        const handling = item.type === 'item' && item.recommendedHandling ? `<div class="tip-copy"><div class="tip-copy-label">建議處理</div><div class="tip-copy-text">${escapeHtml(item.recommendedHandling)}</div></div>` : '';
+        tooltip.innerHTML = `<div class="tip-head"><div class="tip-title">${escapeHtml(item.label)}</div><div class="tip-size">${formatBytes(item.sizeBytes)}</div></div><div class="tip-metrics"><div class="tip-metric"><div class="tip-label">佔目前圓環</div><div class="tip-value">${percent(item.sizeBytes, groupTotal)}</div></div><div class="tip-metric"><div class="tip-label">佔全磁碟已用</div><div class="tip-value">${percent(item.sizeBytes, usedBytes)} · 優先級 ${item.priority}</div></div></div>${badgeRow}${details}${reason}${handling}${item.path ? `<div class="tip-path">${escapeHtml(item.path)}</div>` : ''}`;
+        tooltip.classList.add('show');
+        const box = tooltip.getBoundingClientRect();
+        tooltip.style.left = `${Math.max(12, Math.min(window.innerWidth - box.width - 12, event.clientX + 16))}px`;
+        tooltip.style.top = `${Math.max(12, Math.min(window.innerHeight - box.height - 12, event.clientY + 16))}px`;
+      }
+
+      function focusGroup(key) {
+        focusedGroup = key;
+        hoverSlice = null;
+        tooltip.classList.remove('show');
+        const group = groups.find((entry) => entry.key === key);
+        viewTitle.textContent = group?.label || '候選空間群組';
+        backButton.classList.toggle('visible', Boolean(key));
+        draw();
+      }
+
+      function toggleItem(item) {
+        if (selected.has(item.id)) selected.delete(item.id); else selected.add(item.id);
+        renderPlan();
+        draw();
+      }
+
+      async function reveal(item) {
+        if (!item || item.type !== 'item') return showToast('請先進入群組並指向一個細項');
+        try {
+          const response = await fetch('/reveal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Audit-Token': bridgeToken },
+            body: JSON.stringify({ id: item.id })
+          });
+          const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || 'Finder 無法顯示此項目');
+          showToast('已在 Finder 中選取');
+        } catch (error) {
+          showToast(location.protocol === 'file:' ? '請先執行 launch.command 啟用 Finder 橋接' : error.message);
+        }
+      }
+
+      function renderPlan() {
+        const items = candidates.filter((item) => selected.has(item.id));
+        const bytes = items.reduce((sum, item) => sum + item.sizeBytes, 0);
+        const selectedConservative = items.filter((item) => item.estimateClass === 'conservative').reduce((sum, item) => sum + item.sizeBytes, 0);
+        document.getElementById('planMeta').textContent = items.length ? `${items.length} 項 · ${formatBytes(bytes)} · 高把握 ${formatBytes(selectedConservative)}` : '尚未選擇';
+        copyButton.disabled = !items.length;
+        if (!items.length) {
+          selectedList.innerHTML = '<div class="empty">點進群組後，點擊細項加入規劃。這份清單只存在目前頁面的記憶體中。</div>';
+          return;
+        }
+        selectedList.innerHTML = items.map((item) => `<article class="selected-item"><div class="selected-top"><i class="swatch" style="background:${palette[item.priority]}"></i><div class="selected-title">${escapeHtml(item.label)}</div><div class="selected-size">${formatBytes(item.sizeBytes)}</div></div><div class="selected-flags">${escapeHtml(itemFlags(item))}</div><div class="selected-path"><div class="path" title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</div><button class="remove" data-remove="${escapeHtml(item.id)}" aria-label="從規劃移除">×</button></div></article>`).join('');
+        selectedList.querySelectorAll('[data-remove]').forEach((button) => button.addEventListener('click', () => {
+          selected.delete(button.dataset.remove); renderPlan(); draw();
+        }));
+      }
+
+      canvas.addEventListener('pointermove', (event) => {
+        hoverSlice = pointerSlice(event);
+        canvas.style.cursor = hoverSlice ? 'pointer' : 'default';
+        positionTooltip(event, hoverSlice);
+        draw();
+      });
+      canvas.addEventListener('pointerleave', () => { hoverSlice = null; tooltip.classList.remove('show'); draw(); });
+      canvas.addEventListener('click', (event) => {
+        const item = pointerSlice(event);
+        if (!item) return;
+        if (item.type === 'group') focusGroup(item.id);
+        else if (event.altKey) reveal(item);
+        else toggleItem(item);
+      });
+      canvas.addEventListener('wheel', (event) => {
+        if (!event.ctrlKey) return;
+        event.preventDefault();
+        if (event.deltaY < 0 && !focusedGroup && hoverSlice?.type === 'group') focusGroup(hoverSlice.id);
+        else if (event.deltaY > 0 && focusedGroup) focusGroup(null);
+      }, { passive: false });
+      backButton.addEventListener('click', () => focusGroup(null));
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && focusedGroup) focusGroup(null);
+        if (event.key === 'Enter' && event.metaKey) { event.preventDefault(); reveal(hoverSlice); }
+      });
+      copyButton.addEventListener('click', async () => {
+        const items = candidates.filter((item) => selected.has(item.id));
+        const text = items.map((item) => `${item.label}\t${formatBytes(item.sizeBytes)}\t${itemFlags(item)}\t${item.path}`).join('\n');
+        try { await navigator.clipboard.writeText(text); showToast(`已複製 ${items.length} 項`); }
+        catch { showToast('瀏覽器不允許存取剪貼簿'); }
+      });
+
+      fetch('/health').then((response) => response.json()).then((status) => {
+        if (!status.ok) return;
+        const node = document.getElementById('bridgeState');
+        node.classList.add('live');
+        node.lastElementChild.textContent = 'Finder 橋接已連線 · 僅顯示選取';
+      }).catch(() => {});
+      new ResizeObserver(fitCanvas).observe(stage);
+      renderPlan();
+      fitCanvas();
+    })();
+  </script>
+</body>
+</html>

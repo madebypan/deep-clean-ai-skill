@@ -1,0 +1,4 @@
+interface:
+  display_name: "Deep Clean AI"
+  short_description: "唯讀掃描 Mac 儲存空間，產生互動圓環與安全 Finder 橋接"
+  default_prompt: "Use $deep-clean-ai-skill to read-only scan this Mac for caches, unusually large items, and reclaimable storage, then build the interactive local report."
